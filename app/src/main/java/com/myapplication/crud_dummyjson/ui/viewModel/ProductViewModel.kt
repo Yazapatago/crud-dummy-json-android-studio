@@ -3,7 +3,10 @@ package com.myapplication.crud_dummyjson.ui.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.myapplication.crud_dummyjson.domain.model.ProductModel
-import com.myapplication.crud_dummyjson.domain.repository.ProductRepository
+import com.myapplication.crud_dummyjson.domain.useCase.CreateProductUseCase
+import com.myapplication.crud_dummyjson.domain.useCase.DeleteProductUseCase
+import com.myapplication.crud_dummyjson.domain.useCase.GetProducUseCase
+import com.myapplication.crud_dummyjson.domain.useCase.UpdateProductUseCase
 import com.myapplication.crud_dummyjson.ui.state.ProductUIState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +18,10 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ProductViewModel @Inject constructor(
-    private val repository: ProductRepository
+    private val getProductUseCase: GetProducUseCase,
+    private val createProductUseCase: CreateProductUseCase,
+    private val updateProductUseCase: UpdateProductUseCase,
+    private val deleteProductUseCase: DeleteProductUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProductUIState())
     val uiState: StateFlow<ProductUIState> = _uiState.asStateFlow()
@@ -25,7 +31,7 @@ class ProductViewModel @Inject constructor(
     fun loadProducts() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            runCatching { repository.getProducts() }
+            runCatching { getProductUseCase() }
                 .onSuccess { list -> _uiState.update { it.copy(isLoading = false, products = list) } }
                 .onFailure { e -> _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "No se pudieron cargar los productos") } }
         }
@@ -36,7 +42,7 @@ class ProductViewModel @Inject constructor(
     fun createProduct(product: ProductModel) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, errorMessage = null, successMessage = null) }
-            runCatching { repository.createProduct(product) }
+            runCatching { createProductUseCase(product) }
                 .onSuccess { created ->
                     _uiState.update { it.copy(isSaving = false, products = listOf(created) + it.products, selectedProduct = null, successMessage = "Producto agregado correctamente") }
                 }
@@ -47,7 +53,7 @@ class ProductViewModel @Inject constructor(
     fun updateProduct(product: ProductModel) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, errorMessage = null, successMessage = null) }
-            runCatching { repository.updateProduct(product) }
+            runCatching { updateProductUseCase(product) }
                 .onSuccess { updated ->
                     _uiState.update { state ->
                         state.copy(isSaving = false, products = state.products.map { if (it.id == updated.id) updated else it }, selectedProduct = null, successMessage = "Producto actualizado correctamente")
@@ -60,7 +66,7 @@ class ProductViewModel @Inject constructor(
     fun deleteProduct(product: ProductModel) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, errorMessage = null, successMessage = null) }
-            runCatching { repository.deleteProduct(product.id) }
+            runCatching { deleteProductUseCase(product.id) }
                 .onSuccess {
                     _uiState.update { state -> state.copy(isSaving = false, products = state.products.filterNot { it.id == product.id }, successMessage = "Producto eliminado correctamente") }
                 }
